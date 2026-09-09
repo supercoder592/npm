@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>故宮守藝人：兼任館長（垂直切片）</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🏺</text></svg>">
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="game-root">
+  <canvas id="view3d" width="640" height="360"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div class="hud-box" id="hud-funds">💰 50,000</div>
+      <div class="hud-box" id="hud-day">第 1 天</div>
+      <div class="hud-box"><div id="hud-clock-bar"><div id="hud-clock-fill"></div></div></div>
+      <div class="hud-box" id="hud-visitors">👥 0</div>
+      <div class="hud-box" id="hud-pk">北 0｜南 0</div>
+    </div>
+    <div id="crosshair">·</div>
+    <div id="hint" class="hidden"></div>
+    <div id="toast" class="hidden"></div>
+  </div>
+
+  <!-- 標題畫面 -->
+  <div id="title-screen" class="overlay">
+    <h1>故宮守藝人</h1>
+    <h2>兼任館長・垂直切片版</h2>
+    <p class="title-desc">你是北院修復師，臨危受命兼任館長。<br>
+    修文物、顧品質、賺門票——七天後，與南院一決高下。</p>
+    <div class="keys-help">
+      <span>WASD 移動</span><span>滑鼠 視角</span><span>E 互動</span>
+      <span>R 搬運/放下</span><span>Tab 館長手冊</span><span>右鍵長按 屏息精修</span>
+    </div>
+    <button id="btn-start" class="px-btn big">就 任 開 館</button>
+    <p class="small-note">建議使用電腦＋鍵盤滑鼠遊玩（Chrome / Edge / Firefox）</p>
+  </div>
+
+  <!-- 晨報 / 晚間新聞 / 結局 -->
+  <div id="modal" class="overlay hidden">
+    <div id="modal-card">
+      <div id="modal-title"></div>
+      <div id="modal-body"></div>
+      <button id="modal-btn" class="px-btn">繼 續</button>
+    </div>
+  </div>
+
+  <!-- 館長手冊 -->
+  <div id="menu" class="overlay hidden">
+    <div id="menu-card">
+      <div id="menu-tabs">
+        <button class="tab-btn active" data-tab="collection">館 藏</button>
+        <button class="tab-btn" data-tab="manage">經 營</button>
+        <button class="tab-btn" data-tab="pk">戰 況</button>
+      </div>
+      <div id="menu-body"></div>
+      <div class="menu-foot">Tab / Esc 關閉</div>
+    </div>
+  </div>
+
+  <!-- 修復台 -->
+  <div id="bench" class="overlay hidden">
+    <div id="bench-card">
+      <div id="bench-head">
+        <span id="bench-title">修復台</span>
+        <span id="bench-phase"></span>
+        <button id="bench-exit" class="px-btn small">收工 (Esc)</button>
+      </div>
+      <canvas id="bench-canvas" width="860" height="520"></canvas>
+      <div id="bench-foot"></div>
+    </div>
+  </div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
