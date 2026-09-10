@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { G } from './state.js';
 import { walkable, BENCH_POS } from './world.js';
+import { touch, consumeLook } from './touch.js';
 
 export const player = { x: 0, z: 7, yaw: 0, pitch: 0, speed: 4.6 };
 // 與 THREE 相機一致：rotation.y = yaw 時，面向向量 = (-sin(yaw), 0, -cos(yaw))
@@ -26,6 +27,12 @@ export function initPlayer(camera, dom) {
 
 export function updatePlayer(dt, camera) {
   if (G.mode !== 'walk') return;
+  // 觸控視角
+  if (touch.active) {
+    const [ldx, ldy] = consumeLook();
+    player.yaw -= ldx * 0.006;
+    player.pitch = Math.max(-1.2, Math.min(1.2, player.pitch - ldy * 0.006));
+  }
   const f = new THREE.Vector2(-Math.sin(player.yaw), -Math.cos(player.yaw));
   const r = new THREE.Vector2(-f.y, f.x); // 右方向
   let mx = 0, mz = 0;
@@ -33,9 +40,13 @@ export function updatePlayer(dt, camera) {
   if (keys['KeyS'] || keys['ArrowDown']) { mx -= f.x; mz -= f.y; }
   if (keys['KeyA'] || keys['ArrowLeft']) { mx -= r.x; mz -= r.y; }
   if (keys['KeyD'] || keys['ArrowRight']) { mx += r.x; mz += r.y; }
+  if (touch.active && (touch.moveX || touch.moveY)) {
+    mx += f.x * -touch.moveY + r.x * touch.moveX;
+    mz += f.y * -touch.moveY + r.y * touch.moveX;
+  }
   const len = Math.hypot(mx, mz);
   if (len > 0) {
-    mx /= len; mz /= len;
+    if (len > 1) { mx /= len; mz /= len; } // 搖桿保留類比速度，鍵盤全速
     const step = player.speed * dt;
     const nx = player.x + mx * step, nz = player.z + mz * step;
     if (walkable(nx, player.z)) player.x = nx;

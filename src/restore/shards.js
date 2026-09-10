@@ -74,6 +74,8 @@ export class ShardsGame {
       });
     }
     this.drag = null;
+    this.sel = null;         // 觸控：點選碎片後可用旋轉鈕
+    this.dragId = null;
     this.mouse = { x: 0, y: 0 };
 
     this._down = e => this.onDown(e);
@@ -85,18 +87,18 @@ export class ShardsGame {
       if (e.code === 'KeyQ') this.rotate(-1);
       if (e.code === 'KeyE') this.rotate(1);
     };
-    canvas.addEventListener('mousedown', this._down);
-    window.addEventListener('mouseup', this._up);
-    canvas.addEventListener('mousemove', this._move);
+    canvas.addEventListener('pointerdown', this._down);
+    window.addEventListener('pointerup', this._up);
+    canvas.addEventListener('pointermove', this._move);
     canvas.addEventListener('wheel', this._wheel, { passive: false });
     window.addEventListener('keydown', this._key);
     this.refreshFoot();
   }
 
   destroy() {
-    this.cv.removeEventListener('mousedown', this._down);
-    window.removeEventListener('mouseup', this._up);
-    this.cv.removeEventListener('mousemove', this._move);
+    this.cv.removeEventListener('pointerdown', this._down);
+    window.removeEventListener('pointerup', this._up);
+    this.cv.removeEventListener('pointermove', this._move);
     this.cv.removeEventListener('wheel', this._wheel);
     window.removeEventListener('keydown', this._key);
   }
@@ -122,13 +124,15 @@ export class ShardsGame {
   }
 
   onDown(e) {
-    if (e.button !== 0 || this.phase !== 'assemble') return;
+    if (e.button !== 0 || this.phase !== 'assemble' || this.drag) return;
     const p = this.canvasPos(e);
     for (let i = this.pieces.length - 1; i >= 0; i--) {
       const pc = this.pieces[i];
       if (pc.placed) continue;
       if (this.hitPiece(p, pc)) {
         this.drag = { pc, ox: p.x - pc.x, oy: p.y - pc.y };
+        this.dragId = e.pointerId;
+        this.sel = pc;
         // 拉到最上層
         this.pieces.splice(i, 1); this.pieces.push(pc);
         return;
@@ -137,6 +141,7 @@ export class ShardsGame {
   }
 
   onMove(e) {
+    if (this.drag && e.pointerId !== this.dragId) return; // 多指：只跟主指
     this.mouse = this.canvasPos(e);
     if (this.drag) {
       this.drag.pc.x = this.mouse.x - this.drag.ox;
@@ -145,7 +150,10 @@ export class ShardsGame {
   }
 
   rotate(dir) {
-    if (this.drag) this.drag.pc.rot += dir * Math.PI / 18;
+    const pc = this.drag ? this.drag.pc : this.sel;
+    if (!pc || pc.placed) return;
+    pc.rot += dir * Math.PI / 18;
+    if (!this.drag) this.trySnap(pc); // 放著旋轉到位也能咬合
   }
 
   adjacentOK(pc) {
@@ -155,9 +163,14 @@ export class ShardsGame {
   }
 
   onUp(e) {
-    if (e.button !== 0 || !this.drag) return;
+    if (!this.drag || e.pointerId !== this.dragId) return;
     const pc = this.drag.pc;
     this.drag = null;
+    this.dragId = null;
+    this.trySnap(pc);
+  }
+
+  trySnap(pc) {
     // 未拼合碎片以質心為原點繪製 → 質心世界位置即 (pc.x, pc.y)
     // 目標：質心對上 (CX+cx, CY+cy)，且旋轉歸零
     const tx = CX + pc.cx, ty = CY + pc.cy;
@@ -172,6 +185,7 @@ export class ShardsGame {
         return;
       }
       pc.placed = true; pc.x = CX; pc.y = CY; pc.rot = 0;
+      if (this.sel === pc) this.sel = null;
       sndSnap();
       this.refreshFoot();
       if (this.pieces.every(p => p.placed)) { this.phase = 'glue'; this.refreshFoot(); }
@@ -183,8 +197,13 @@ export class ShardsGame {
   refreshFoot() {
     const f = this.o.setFoot, ph = this.o.setPhase;
     if (this.phase === 'assemble') {
-      ph('工序 1／3：拼接復位 — 拖曳碎片至中央虛線圓，Q／E 或滾輪旋轉，斷面吻合會自動咬合。從相鄰碎片依序拼！');
-      f(`已拼合 <b>${this.placedCount()}</b> ／ ${N} 片`);
+      ph('工序 1／3：拼接復位 — 拖曳碎片至中央虛線圓，旋轉到位、斷面吻合會自動咬合。從相鄰碎片依序拼！');
+      f(`已拼合 <b>${this.placedCount()}</b> ／ ${N} 片
+         <button class="px-btn small" id="sh-ccw">⟲ 左旋 (Q)</button>
+         <button class="px-btn small" id="sh-cw">⟳ 右旋 (E)</button>
+         <span style="font-size:12px;color:#9a8a68">點選碎片後旋轉；滑鼠亦可用滾輪</span>`);
+      document.getElementById('sh-ccw').onclick = () => this.rotate(-1);
+      document.getElementById('sh-cw').onclick = () => this.rotate(1);
     } else if (this.phase === 'glue') {
       ph('工序 2／3：黏合 — 碎片全數歸位。選擇黏合劑（前輩的忠告：便宜的膠，貴的教訓）。');
       f(`<button class="px-btn small" id="gl-b72">Paraloid B-72（$800・可逆）</button>
@@ -225,8 +244,8 @@ export class ShardsGame {
     g.closePath();
     g.fillStyle = fill;
     g.fill();
-    g.strokeStyle = pc.placed ? 'rgba(60,90,86,.8)' : '#5a4830';
-    g.lineWidth = 2;
+    g.strokeStyle = pc.placed ? 'rgba(60,90,86,.8)' : (pc === this.sel ? '#ffd94a' : '#5a4830');
+    g.lineWidth = pc === this.sel && !pc.placed ? 3 : 2;
     g.stroke();
     g.restore();
   }

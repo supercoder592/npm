@@ -5,6 +5,7 @@ import { rebuildArtifactMesh, drawLabel } from '../artifacts.js';
 import { ScrubGame } from './scrub.js';
 import { ShardsGame } from './shards.js';
 import { sndGood, sndBad } from '../audio.js';
+import { touch } from '../touch.js';
 
 let game = null;
 let scene = null;
@@ -81,5 +82,5 @@ export function closeBench() {
   G.carrying = a;               // 修完抱在手上，走回展廳放展位
   $('bench').classList.add('hidden');
   G.mode = 'walk';
-  document.getElementById('view3d').requestPointerLock?.();
+  if (!touch.active) document.getElementById('view3d').requestPointerLock?.();
 }

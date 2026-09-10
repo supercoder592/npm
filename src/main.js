@@ -14,6 +14,7 @@ import {
 } from './ui.js';
 import { fameStars } from './state.js';
 import { beep } from './audio.js';
+import { initTouch, touch, updateTouchUI } from './touch.js';
 
 const canvas = document.getElementById('view3d');
 const RW = 640, RH = 360; // PSX 低解析內部渲染
@@ -55,7 +56,7 @@ function startDay(first = false) {
 function resumePlay() {
   G.mode = 'walk';
   G.paused = false;
-  canvas.requestPointerLock?.();
+  if (!touch.active) canvas.requestPointerLock?.();
 }
 
 let dayEnding = false;
@@ -102,55 +103,68 @@ function tutorialCheck() {
   else if (s === 3 && !G.carrying) tutorialAdvance(4);
 }
 
+// ---------- 動作（鍵盤與觸控共用） ----------
+function actionInteract() {
+  if (G.mode !== 'walk') return;
+  const t = getInteractTarget();
+  if (!t) return;
+  if (t.type === 'artifact') {
+    const a = t.obj;
+    showToast(`<b>${a.name}</b>　${'★'.repeat(fameStars(a.fame))}<br>
+      <span style="font-size:13px">${catName(a.cat)}・品質 ${Math.round(a.q)}・劣化 ${a.decay.toFixed(1)}/日
+      ${a.broken ? '・<span style="color:#e06c5a">碎裂待拼接</span>' : ''}
+      ${a.offDisplay ? '・<span style="color:#e06c5a">強制下架中</span>' : ''}</span>`, 4);
+  } else if (t.type === 'bench') {
+    if (G.carrying) {
+      document.exitPointerLock?.();
+      hideToast();
+      openBench(G.carrying);
+    } else {
+      showToast('修復台空著。先面向展廳的文物按 <b>R</b>（搬/放）搬過來。', 3);
+    }
+  }
+}
+
+function actionCarry() {
+  if (G.mode !== 'walk') return;
+  const t = getInteractTarget();
+  if (!t) return;
+  if (t.type === 'artifact' && !G.carrying) {
+    G.carrying = t.obj;
+    removeFromPedestal(t.obj);
+    beep(520, 0.07);
+  } else if (t.type === 'pedestal' && G.carrying) {
+    placeOnPedestal(G.carrying, t.obj);
+    G.carrying = null;
+    beep(700, 0.07);
+  }
+}
+
+function actionMenuToggle() {
+  if (G.mode === 'walk') {
+    G.mode = 'menu'; G.paused = true;
+    document.exitPointerLock?.();
+    openMenu();
+  } else if (G.mode === 'menu') {
+    closeMenu();
+    resumePlay();
+  }
+}
+
 // ---------- 輸入 ----------
 window.addEventListener('keydown', e => {
   if (G.mode === 'walk') {
-    if (e.code === 'Tab') {
-      e.preventDefault();
-      G.mode = 'menu'; G.paused = true;
-      document.exitPointerLock?.();
-      openMenu();
-    } else if (e.code === 'KeyE') {
-      const t = getInteractTarget();
-      if (!t) return;
-      if (t.type === 'artifact') {
-        const a = t.obj;
-        showToast(`<b>${a.name}</b>　${'★'.repeat(fameStars(a.fame))}<br>
-          <span style="font-size:13px">${catName(a.cat)}・品質 ${Math.round(a.q)}・劣化 ${a.decay.toFixed(1)}/日
-          ${a.broken ? '・<span style="color:#e06c5a">碎裂待拼接</span>' : ''}
-          ${a.offDisplay ? '・<span style="color:#e06c5a">強制下架中</span>' : ''}</span>`, 4);
-      } else if (t.type === 'bench') {
-        if (G.carrying) {
-          document.exitPointerLock?.();
-          hideToast();
-          openBench(G.carrying);
-        } else {
-          showToast('修復台空著。先面向展廳的文物按 <b>R</b> 搬過來。', 3);
-        }
-      }
-    } else if (e.code === 'KeyR') {
-      const t = getInteractTarget();
-      if (!t) return;
-      if (t.type === 'artifact' && !G.carrying) {
-        G.carrying = t.obj;
-        removeFromPedestal(t.obj);
-        beep(520, 0.07);
-      } else if (t.type === 'pedestal' && G.carrying) {
-        placeOnPedestal(G.carrying, t.obj);
-        G.carrying = null;
-        beep(700, 0.07);
-      }
-    }
+    if (e.code === 'Tab') { e.preventDefault(); actionMenuToggle(); }
+    else if (e.code === 'KeyE') actionInteract();
+    else if (e.code === 'KeyR') actionCarry();
   } else if (G.mode === 'menu') {
-    if (e.code === 'Tab' || e.code === 'Escape') {
-      e.preventDefault();
-      closeMenu();
-      resumePlay();
-    }
+    if (e.code === 'Tab' || e.code === 'Escape') { e.preventDefault(); actionMenuToggle(); }
   } else if (G.mode === 'bench') {
     if (e.code === 'Escape') abortBench();
   }
 });
+
+initTouch({ onInteract: actionInteract, onCarry: actionCarry, onMenu: actionMenuToggle });
 
 // 點擊畫面重新鎖定滑鼠
 canvas.addEventListener('click', () => {
@@ -186,9 +200,11 @@ function loop(now) {
 
   updatePlayer(dt, camera);
 
+  updateTouchUI(G.mode);
+
   // 互動提示
   if (G.mode === 'walk') {
-    if (document.pointerLockElement !== canvas && !G.paused) {
+    if (!touch.active && document.pointerLockElement !== canvas && !G.paused) {
       showHint('點擊畫面以繼續');
     } else {
       const t = getInteractTarget();

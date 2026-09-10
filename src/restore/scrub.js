@@ -1,6 +1,7 @@
 // 塗刮引擎：青銅除鏽（檢視→除鏽→封護）與基礎除塵共用
 import { G, clamp, pushNews } from '../state.js';
 import { brushNoise, sndDamage, sndSnap, beep } from '../audio.js';
+import { touch } from '../touch.js';
 
 const W = 860, H = 520, CX = 430, CY = 280;
 
@@ -140,9 +141,9 @@ export class ScrubGame {
     this._up = e => this.onUp(e);
     this._move = e => this.onMove(e);
     this._ctx = e => e.preventDefault();
-    canvas.addEventListener('mousedown', this._down);
-    window.addEventListener('mouseup', this._up);
-    canvas.addEventListener('mousemove', this._move);
+    canvas.addEventListener('pointerdown', this._down);
+    window.addEventListener('pointerup', this._up);
+    canvas.addEventListener('pointermove', this._move);
     canvas.addEventListener('contextmenu', this._ctx);
     this.refreshFoot();
   }
@@ -156,9 +157,9 @@ export class ScrubGame {
   }
 
   destroy() {
-    this.cv.removeEventListener('mousedown', this._down);
-    window.removeEventListener('mouseup', this._up);
-    this.cv.removeEventListener('mousemove', this._move);
+    this.cv.removeEventListener('pointerdown', this._down);
+    window.removeEventListener('pointerup', this._up);
+    this.cv.removeEventListener('pointermove', this._move);
     this.cv.removeEventListener('contextmenu', this._ctx);
   }
 
@@ -213,12 +214,21 @@ export class ScrubGame {
           : '基礎除塵 — 按住左鍵以軟毛刷清除積塵，手速過快會傷及本體。');
       }
       f(`清潔進度 <b id="sc-prog">0%</b>　失誤 <b id="sc-dmg">0</b> 次
+         ${touch.active ? '<button class="px-btn small" id="sc-hold">按住＝屏息精修</button>' : ''}
          <button class="px-btn small" id="sc-fin" disabled>完成清潔 →</button>`);
       const b = document.getElementById('sc-fin');
       if (b) b.onclick = () => {
         if (this.o.mode === 'derust') { this.phase = 'seal'; this.refreshFoot(); }
         else this.finish(true);
       };
+      const hold = document.getElementById('sc-hold');
+      if (hold) {
+        hold.addEventListener('pointerdown', e => { e.preventDefault(); this.rmb = true; hold.classList.add('holding'); });
+        const off = () => { this.rmb = false; hold.classList.remove('holding'); };
+        hold.addEventListener('pointerup', off);
+        hold.addEventListener('pointercancel', off);
+        hold.addEventListener('pointerleave', off);
+      }
     } else if (this.phase === 'seal') {
       ph('工序 3／3：封護 — 選擇封護材料。可逆性是修復倫理的底線……但錢包也是現實。');
       f(`<button class="px-btn small" id="sl-b72">Paraloid B-72（$800・可逆・劣化−25%）</button>
